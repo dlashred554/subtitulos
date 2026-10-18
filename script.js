@@ -184,7 +184,12 @@ async function loadFFmpeg(){
     // The worker itself imports the official CDN worker as an ES module.
     classWorkerURL: localWorkerURL,
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm")
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm", true, ({received,total})=>{
+      if(total){
+        setProgress(1 + (received/total)*2, "Descargando el motor de vídeo…",
+          `${(received/1048576).toFixed(0)} de ${(total/1048576).toFixed(0)} MB · solo la primera vez`);
+      }
+    })
   });
   ffmpegReady = true;
 }
@@ -204,16 +209,28 @@ subsToggle.addEventListener("change",()=>{
 async function loadTranscriber(){
   if(transcriber && transcriberModel === subsModel.value) return;
   const modelId = subsModel.value;
-  setProgress(3,"Cargando el modelo de voz…","Descarga única; el navegador lo guarda en caché para la próxima vez.");
+  setProgress(3,"Cargando el modelo de voz…","Conectando con el servidor del modelo…");
 
   const tf = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2");
   tf.env.allowLocalModels = false;
 
+  const files = {};
+  let lastUi = 0;
   transcriber = await tf.pipeline("automatic-speech-recognition", modelId, {
+    device: "wasm",
+    dtype: { encoder_model: "q8", decoder_model_merged: "q8" },
     progress_callback: (p) => {
-      if(p.status === "progress" && typeof p.progress === "number"){
-        setProgress(3 + p.progress*0.04, "Cargando el modelo de voz…",
-          `${p.file || "modelo"} · ${Math.round(p.progress)}%`);
+      if(p.status === "progress" && p.total){
+        files[p.file] = {loaded:p.loaded, total:p.total};
+        const now = performance.now();
+        if(now - lastUi < 150) return;
+        lastUi = now;
+        let loaded = 0, total = 0;
+        for(const f of Object.values(files)){ loaded += f.loaded; total += f.total; }
+        setProgress(3 + (loaded/total)*7, "Descargando el modelo de voz…",
+          `${(loaded/1048576).toFixed(0)} de ${(total/1048576).toFixed(0)} MB · solo la primera vez, luego queda en caché`);
+      }else if(p.status === "ready"){
+        setProgress(10,"Modelo de voz listo","Empezando…");
       }
     }
   });
@@ -350,8 +367,8 @@ async function generateClips(){
       const index = i+1;
       const {start,end} = segments[i];
       const dur = Math.max(1,end-start);
-      const base = 8 + (i/total)*88;
-      const share = 88/total;
+      const base = 11 + (i/total)*85;
+      const share = 85/total;
 
       let cues = [];
       let srtText = "";

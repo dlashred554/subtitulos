@@ -160,6 +160,12 @@ function addFfmpegLog(message){
   log.textContent = (log.textContent + message + "\n").slice(-6000);
 }
 
+function withTimeout(promise,ms,message){
+  let timer;
+  const timeout = new Promise((_,reject)=>{ timer = setTimeout(()=>reject(new Error(message)),ms); });
+  return Promise.race([promise,timeout]).finally(()=>clearTimeout(timer));
+}
+
 async function loadFFmpeg(){
   if(ffmpegReady) return;
   setProgress(3,"Preparando el motor de vídeo…","Descargando el motor MP4. Solo ocurre la primera vez.");
@@ -179,18 +185,13 @@ async function loadFFmpeg(){
   const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
   const localWorkerURL = new URL("./ffmpeg-worker.js", document.baseURI).href;
 
-  await ffmpeg.load({
+  await withTimeout(ffmpeg.load({
     // The main FFmpeg worker MUST be same-origin on GitHub Pages.
     // The worker itself imports the official CDN worker as an ES module.
     classWorkerURL: localWorkerURL,
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm", true, ({received,total})=>{
-      if(total){
-        setProgress(1 + (received/total)*2, "Descargando el motor de vídeo…",
-          `${(received/1048576).toFixed(0)} de ${(total/1048576).toFixed(0)} MB · solo la primera vez`);
-      }
-    })
-  });
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm")
+  }), 120000, "El motor de vídeo no responde. Recarga con Ctrl+F5 y comprueba que ffmpeg-worker.js está subido en la misma carpeta.");
   ffmpegReady = true;
 }
 

@@ -160,6 +160,14 @@ function addFfmpegLog(message){
   log.textContent = (log.textContent + message + "\n").slice(-6000);
 }
 
+function step(message){
+  console.log("[ClipFinder]", message);
+  addFfmpegLog("▸ " + message);
+}
+
+window.addEventListener("unhandledrejection", e => addFfmpegLog("✖ " + (e.reason?.message || e.reason)));
+window.addEventListener("error", e => addFfmpegLog("✖ " + e.message));
+
 function withTimeout(promise,ms,message){
   let timer;
   const timeout = new Promise((_,reject)=>{ timer = setTimeout(()=>reject(new Error(message)),ms); });
@@ -170,8 +178,13 @@ async function loadFFmpeg(){
   if(ffmpegReady) return;
   setProgress(3,"Preparando el motor de vídeo…","Descargando el motor MP4. Solo ocurre la primera vez.");
 
-  const ffmpegModule = await import("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js");
-  const utilModule = await import("https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js");
+  step("1/4 Descargando librería FFmpeg (jsDelivr)…");
+  const ffmpegModule = await withTimeout(
+    import("https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js"),
+    60000, "No se pudo descargar la librería FFmpeg desde cdn.jsdelivr.net. Revisa tu conexión o si algo bloquea ese dominio.");
+  const utilModule = await withTimeout(
+    import("https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js"),
+    60000, "No se pudo descargar @ffmpeg/util desde cdn.jsdelivr.net.");
 
   ffmpeg = new ffmpegModule.FFmpeg();
   fetchFile = utilModule.fetchFile;
@@ -182,16 +195,20 @@ async function loadFFmpeg(){
     if(/error|invalid|failed|unable|unknown/i.test(message)) addFfmpegLog(message);
   });
 
-  const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd";
+  // El worker es de tipo "module", así que el core debe ser la versión ESM (no UMD).
+  const baseURL = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm";
   const localWorkerURL = new URL("./ffmpeg-worker.js", document.baseURI).href;
 
-  await withTimeout(ffmpeg.load({
-    // The main FFmpeg worker MUST be same-origin on GitHub Pages.
-    // The worker itself imports the official CDN worker as an ES module.
-    classWorkerURL: localWorkerURL,
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm")
-  }), 120000, "El motor de vídeo no responde. Recarga con Ctrl+F5 y comprueba que ffmpeg-worker.js está subido en la misma carpeta.");
+  step("2/4 Descargando motor de vídeo (≈30 MB)…");
+  const coreURL = await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript");
+  const wasmURL = await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm");
+
+  step("3/4 Iniciando el motor (worker: " + localWorkerURL + ")…");
+  await withTimeout(
+    ffmpeg.load({ classWorkerURL: localWorkerURL, coreURL, wasmURL }),
+    90000,
+    "El motor de vídeo no arranca. Comprueba que ffmpeg-worker.js está subido en la misma carpeta que index.html y recarga con Ctrl+F5.");
+  step("4/4 Motor de vídeo listo ✔");
   ffmpegReady = true;
 }
 
@@ -212,7 +229,11 @@ async function loadTranscriber(){
   const modelId = subsModel.value;
   setProgress(3,"Cargando el modelo de voz…","Conectando con el servidor del modelo…");
 
-  const tf = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2");
+  step("Descargando librería de voz (transformers.js)…");
+  const tf = await withTimeout(
+    import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2"),
+    90000, "No se pudo descargar transformers.js desde cdn.jsdelivr.net.");
+  step("Descargando modelo " + modelId + " (huggingface.co)…");
   tf.env.allowLocalModels = false;
 
   const files = {};
@@ -230,11 +251,14 @@ async function loadTranscriber(){
         for(const f of Object.values(files)){ loaded += f.loaded; total += f.total; }
         setProgress(3 + (loaded/total)*7, "Descargando el modelo de voz…",
           `${(loaded/1048576).toFixed(0)} de ${(total/1048576).toFixed(0)} MB · solo la primera vez, luego queda en caché`);
+      }else if(p.status === "initiate"){
+        step("Modelo: " + (p.file || p.name));
       }else if(p.status === "ready"){
         setProgress(10,"Modelo de voz listo","Empezando…");
       }
     }
   });
+  step("Modelo de voz listo ✔");
   transcriberModel = modelId;
 }
 

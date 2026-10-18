@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClipFinder — Clips automáticos</title>
+  <meta name="description" content="Crea clips MP4 automáticamente desde un vídeo largo.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">CF</div>
+      <div>
+        <strong>ClipFinder</strong>
+        <span>Automatic Video Clipper</span>
+      </div>
+    </div>
+    <div class="status"><span class="status-dot"></span> Conversión local</div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="eyebrow">CLIPS AUTOMÁTICOS</div>
+      <h1>Convierte un vídeo largo en varios clips.</h1>
+      <p>Sube tu vídeo y ClipFinder preparará automáticamente varios fragmentos en formato MP4. No tendrás que recortar cada uno manualmente.</p>
+    </section>
+
+    <section class="panel upload-panel">
+      <div class="panel-title">
+        <div>
+          <h2>1. Sube tu vídeo</h2>
+          <p>MP4 recomendado (H.264 + AAC). Un vídeo de 3 minutos funciona perfectamente.</p>
+        </div>
+        <span class="step">01</span>
+      </div>
+
+      <label class="dropzone" id="dropzone" for="videoInput">
+        <div class="upload-icon">↑</div>
+        <strong>Selecciona un vídeo</strong>
+        <span>o arrástralo aquí</span>
+        <small>La conversión se hace en tu navegador; no se sube a un servidor.</small>
+        <input id="videoInput" type="file" accept="video/mp4,video/quicktime,video/webm,video/*">
+      </label>
+
+      <div id="fileInfo" class="file-info hidden"></div>
+
+      <video id="sourceVideo" class="source-video hidden" controls playsinline></video>
+
+      <div class="options">
+        <label class="check">
+          <input type="checkbox" id="subsToggle" checked>
+          <span><b>Añadir subtítulos (canciones en español)</b><small>Transcribe la letra en tu navegador y la incrusta en cada clip. Además se genera un archivo .srt.</small></span>
+        </label>
+        <label class="select-row">
+          <span>Calidad de transcripción</span>
+          <select id="subsModel">
+            <option value="Xenova/whisper-small" selected>Mejor (≈250 MB, más lento)</option>
+            <option value="Xenova/whisper-base">Rápida (≈80 MB, menos precisa)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="generateBtn" class="button button-primary" disabled>
+          Generar clips automáticamente
+        </button>
+      </div>
+
+      <div id="progressArea" class="progress-area hidden">
+        <div class="progress-head">
+          <span id="progressText">Preparando...</span>
+          <span id="progressPercent">0%</span>
+        </div>
+        <div class="progress-track"><div id="progressBar"></div></div>
+        <p id="progressDetail">El primer procesamiento puede tardar un poco.</p><pre id="ffmpegLog" class="ffmpeg-log hidden"></pre>
+      </div>
+    </section>
+
+    <section id="resultsSection" class="panel results-panel hidden">
+      <div class="panel-title">
+        <div>
+          <h2>2. Tus clips</h2>
+          <p id="resultsSummary">Clips preparados automáticamente.</p>
+        </div>
+        <span class="step">02</span>
+      </div>
+      <div id="results" class="results-grid"></div>
+    </section>
+
+    <section id="notice" class="notice hidden"></section>
+
+    <section class="how panel">
+      <div>
+        <h2>¿Cómo funciona?</h2>
+        <p>ClipFinder divide el vídeo en varios fragmentos cortos y genera cada uno como un archivo MP4 independiente.</p>
+      </div>
+      <div class="how-list">
+        <div><span>1</span><b>Sube</b><small>Tu vídeo largo</small></div>
+        <div><span>2</span><b>Genera</b><small>Clips automáticamente</small></div>
+        <div><span>3</span><b>Descarga</b><small>MP4 individuales</small></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>ClipFinder</span>
+    <span>Conversión local en el navegador</span>
+  </footer>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
